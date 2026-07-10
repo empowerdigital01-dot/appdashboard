@@ -18,14 +18,24 @@ async function main() {
     // Try direct PostgreSQL connection
     try {
       const { Client } = await import('pg')
-      const client = new Client({ connectionString: databaseUrl })
+      const client = new Client({
+        connectionString: databaseUrl,
+        ssl: { rejectUnauthorized: false },
+      })
       await client.connect()
       console.log('  Conectado ao banco PostgreSQL.')
 
-      const statements = sql
+      // Remove comment-only lines, then send the full SQL as one statement
+      const cleaned = sql
+        .split('\n')
+        .filter((line) => !line.trimStart().startsWith('--'))
+        .join('\n')
+        .trim()
+
+      const statements = cleaned
         .split(';')
         .map((s) => s.trim())
-        .filter((s) => s.length > 0 && !s.startsWith('--'))
+        .filter((s) => s.length > 0)
 
       let successCount = 0
       const created: string[] = []

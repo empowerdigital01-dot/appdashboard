@@ -7,8 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-"db:setup": "dotenv -e .env.local -- tsx scripts/apply-schema.ts",
-"create-admin": "dotenv -e .env.local -- tsx scripts/create-admin.ts"
+    "check-env": "dotenv -e .env.local -- tsx scripts/check-env.ts",
+    "db:setup": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 dotenv -e .env.local -- tsx scripts/apply-schema.ts",
+    "create-admin": "dotenv -e .env.local -- tsx scripts/create-admin.ts",
+    "scan-secrets": "tsx scripts/scan-secrets.ts",
+    "prepare": "husky"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",
@@ -24,9 +27,11 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "husky": "^9.1.7",
     "pg": "^8.22.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.0",

@@ -98,6 +98,8 @@ Acesse [http://localhost:3000/admin/login](http://localhost:3000/admin/login) e 
 | `npm run lint` | Verifica lint |
 | `npm run db:setup` | Aplica schema SQL no banco (via Supabase CLI) |
 | `npm run create-admin -- email senha` | Cria usuário administrador |
+| `npm run check-env` | Verifica se as variáveis de ambiente estão configuradas |
+| `npm run scan-secrets` | Verifica se há chaves/tokens expostos no código |
 
 ## Colunas da planilha
 
@@ -114,3 +116,81 @@ O parser aceita colunas em português ou inglês:
 | Conversões / Conversions | `conversions` |
 | Status / Status | `status` |
 | Tipo / Type | `type` |
+
+## Troubleshooting
+
+### Variáveis de ambiente não são lidas após editar o .env.local
+
+Variáveis com prefixo `NEXT_PUBLIC_*` são embutidas no bundle durante a inicialização do Next.js. Se você editar o `.env.local` e o servidor já estiver rodando, as alterações **não terão efeito**.
+
+**Solução:** Pare o servidor com `Ctrl+C` e inicie novamente:
+
+```bash
+npm run dev
+```
+
+### Erro persistente mesmo após reiniciar
+
+Se o erro persistir after reiniciar o servidor:
+
+1. Apague a pasta `.next` (cache do build do Next.js)
+2. Reinicie o servidor
+
+```bash
+rm -rf .next
+npm run dev
+```
+
+### Verificar se as variáveis estão sendo lidas
+
+Antes de reportar um bug, rode o diagnóstico:
+
+```bash
+npm run check-env
+```
+
+Isso imprime no terminal se cada variável obrigatória foi encontrada (sem expor os valores completos). Se algum item aparecer como `✗ NÃO ENCONTRADA`, verifique o conteúdo do `.env.local`.
+
+## Segurança
+
+### Nunca commitar `.env.local`
+
+O arquivo `.env.local` contém chaves secretas do Supabase e **nunca** deve ser versionado. Ele já está no `.gitignore`. Se precisar compartilhar as variáveis com outro desenvolvedor, envie por canal seguro (nunca por e-mail ou chat aberto).
+
+### Nunca colar chaves em issues, PRs, chats ou documentação
+
+Chaves do Supabase (`SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, etc.) são credenciais de acesso ao banco de dados. Não as exponha em:
+
+- Issues ou pull requests no GitHub
+- Mensagens de chat ou e-mails
+- Documentação ou READMEs
+- Prints de tela
+
+Use placeholders como `eyJhbGciOi...` quando precisar mostrar o formato.
+
+### Se uma chave for exposta, regenere imediatamente
+
+Se você acidentalmente commitou ou compartilhou uma chave:
+
+1. Vá em **Supabase → Project Settings → API Keys**
+2. Clique em **Regenerate** na chave comprometida
+3. Atualize o `.env.local` com a nova chave
+4. Reinicie o servidor (`npm run dev`)
+5. Use `git filter-branch` ou o Supabase Dashboard para revogar o acesso antigo se necessário
+
+### Proteção automática (pre-commit hook)
+
+Um hook de pre-commit (Husky) roda automaticamente antes de cada commit e bloqueia se encontrar:
+
+- JWTs do Supabase (padrão `eyJ...eyJ...`)
+- `SUPABASE_SERVICE_ROLE_KEY=` ou `SUPABASE_SECRET_KEY=` com valor em qualquer arquivo que não seja `.env.example`
+
+### Verificação manual
+
+Antes de um push manual (especialmente com `--no-verify`), rode:
+
+```bash
+npm run scan-secrets
+```
+
+Isso varre todos os arquivos do projeto procurando padrões de chaves e URLs expostas.
