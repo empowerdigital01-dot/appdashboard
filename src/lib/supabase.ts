@@ -1,22 +1,13 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const ENV_VARS = {
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-} as const
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value || value.trim() === '') {
+    const list = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']
+      .filter((n) => !process.env[n] || process.env[n]!.trim() === '')
+      .map((n) => `  - ${n}`)
+      .join('\n')
 
-function validateEnvVars(): void {
-  const missing: string[] = []
-
-  for (const [name, value] of Object.entries(ENV_VARS)) {
-    if (!value || value.trim() === '') {
-      missing.push(name)
-    }
-  }
-
-  if (missing.length > 0) {
-    const list = missing.map((n) => `  - ${n}`).join('\n')
     throw new Error(
       `\n` +
       `┌─────────────────────────────────────────────────────────────────┐\n` +
@@ -36,31 +27,30 @@ function validateEnvVars(): void {
       `└─────────────────────────────────────────────────────────────────┘\n`
     )
   }
+  return value
 }
-
-validateEnvVars()
 
 let _admin: SupabaseClient | null = null
 let _client: SupabaseClient | null = null
 
 export function getSupabaseAdmin(): SupabaseClient {
   if (!_admin) {
-    _admin = createClient(
-      ENV_VARS.NEXT_PUBLIC_SUPABASE_URL!,
-      ENV_VARS.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    const url = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
+    const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
+    _admin = createClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
   }
   return _admin
 }
 
 export function getSupabaseClient(): SupabaseClient {
   if (!_client) {
-    _client = createClient(
-      ENV_VARS.NEXT_PUBLIC_SUPABASE_URL!,
-      ENV_VARS.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { auth: { autoRefreshToken: true, persistSession: true } }
-    )
+    const url = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
+    const anonKey = requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+    _client = createClient(url, anonKey, {
+      auth: { autoRefreshToken: true, persistSession: true },
+    })
   }
   return _client
 }
