@@ -7,10 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check-env": "dotenv -e .env.local -- tsx scripts/check-env.ts",
-    "db:setup": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 dotenv -e .env.local -- tsx scripts/apply-schema.ts",
-    "create-admin": "dotenv -e .env.local -- tsx scripts/create-admin.ts",
-    "scan-secrets": "tsx scripts/scan-secrets.ts",
     "prepare": "husky"
   },
   "dependencies": {

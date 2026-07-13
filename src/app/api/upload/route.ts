@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
 import { parseSpreadsheet } from '@/lib/parseSpreadsheet'
-import { requireAdminAuth } from '@/lib/apiAuth'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAdminAuth(req)
-  if (!auth.authenticated) return auth.error!
-
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File | null

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { getSupabaseClient } from '@/lib/supabase'
 
 interface Account {
   id: string
@@ -23,16 +22,7 @@ export default function AccountDetailPage() {
   useEffect(() => {
     async function load() {
       try {
-        const { data } = await getSupabaseClient().auth.getSession()
-        const token = data.session?.access_token
-        if (!token) {
-          router.push('/admin/login')
-          return
-        }
-
-        const res = await fetch(`/api/admin/accounts/${accountId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const res = await fetch(`/api/admin/accounts/${accountId}`)
 
         if (!res.ok) {
           setFetchError(true)
@@ -51,23 +41,15 @@ export default function AccountDetailPage() {
       }
     }
     load()
-  }, [accountId, router])
+  }, [accountId])
 
   async function regenerateToken() {
     if (!confirm('Tem certeza? O link anterior será invalidado.')) return
     setRegenerating(true)
 
     try {
-      const { data } = await getSupabaseClient().auth.getSession()
-      const token = data.session?.access_token
-      if (!token) {
-        router.push('/admin/login')
-        return
-      }
-
       const res = await fetch(`/api/admin/accounts/${accountId}/regenerate-token`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
         const data = await res.json()

@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { getSupabaseClient } from '@/lib/supabase'
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -42,13 +41,6 @@ export default function UploadPage() {
     setUploading(true)
 
     try {
-      const { data: sessionData } = await getSupabaseClient().auth.getSession()
-      const token = sessionData.session?.access_token
-      if (!token) {
-        router.push('/admin/login')
-        return
-      }
-
       const formData = new FormData()
       formData.append('file', file)
       formData.append('account_id', accountId as string)
@@ -57,7 +49,6 @@ export default function UploadPage() {
 
       const res = await fetch('/api/upload', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       })
 

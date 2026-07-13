@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { getSupabaseClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 interface Account {
@@ -15,14 +13,10 @@ interface Account {
 
 export default function AdminPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [session, setSession] = useState<boolean | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const router = useRouter()
 
-  const fetchAccounts = useCallback(async (accessToken: string) => {
-    const res = await fetch('/api/admin/accounts', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+  const fetchAccounts = useCallback(async () => {
+    const res = await fetch('/api/admin/accounts')
     if (res.ok) {
       const data = await res.json()
       setAccounts(data)
@@ -30,17 +24,8 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
-    getSupabaseClient()
-      .auth.getSession()
-      .then(({ data }) => {
-        if (!data.session) {
-          router.push('/admin/login')
-          return
-        }
-        setSession(true)
-        fetchAccounts(data.session.access_token)
-      })
-  }, [router, fetchAccounts])
+    fetchAccounts()
+  }, [fetchAccounts])
 
   function copyLink(slug: string, token: string) {
     const link = `${window.location.origin}/d/${slug}/${token}`
@@ -49,36 +34,17 @@ export default function AdminPage() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  if (session === null) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-axium-bg">
-        <p className="text-axium-muted">Carregando...</p>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-axium-bg p-4 sm:p-6">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-bold text-white sm:text-2xl">Contas</h1>
-          <div className="flex gap-3">
-            <Link
-              href="/admin/novo"
-              className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-black transition hover:bg-axium-positive"
-            >
-              Nova Conta
-            </Link>
-            <button
-              onClick={async () => {
-                await getSupabaseClient().auth.signOut()
-                router.push('/admin/login')
-              }}
-              className="rounded-lg border border-axium-border px-4 py-2 text-sm text-axium-muted transition hover:text-white"
-            >
-              Sair
-            </button>
-          </div>
+          <Link
+            href="/admin/novo"
+            className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-black transition hover:bg-axium-positive"
+          >
+            Nova Conta
+          </Link>
         </div>
 
         <div className="space-y-3">

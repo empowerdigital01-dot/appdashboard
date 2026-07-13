@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
-import { requireAdminAuth } from '@/lib/apiAuth'
 
 export async function GET(req: NextRequest) {
-  const auth = await requireAdminAuth(req)
-  if (!auth.authenticated) return auth.error!
-
   const { data, error } = await getSupabaseAdmin()
     .from('accounts')
     .select('id, name, slug, access_token, created_at')
@@ -19,9 +15,6 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAdminAuth(req)
-  if (!auth.authenticated) return auth.error!
-
   const { name, slug } = await req.json()
 
   if (!name || !slug) {
