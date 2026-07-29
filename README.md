@@ -57,7 +57,9 @@ O `project_ref` é o subdomínio da URL do projeto (ex: `XYZ` em `https://XYZ.su
 npm run db:setup
 ```
 
-Isso executa o arquivo `supabase/schema.sql` no seu banco, criando as tabelas `accounts`, `uploads` e `metrics`, além de habilitar RLS.
+Isso executa o arquivo `supabase/schema.sql` no seu banco, criando as tabelas `accounts`, `uploads` e `metrics` (com coluna `data JSONB`), além de habilitar RLS.
+
+**Se você já tem a tabela `metrics` com colunas fixas**, execute o script em `supabase/migrations/fix_metrics_columns.sql` no SQL Editor do Supabase antes de usar o upload.
 
 ### 6. Criar o primeiro administrador
 
@@ -101,21 +103,16 @@ Acesse [http://localhost:3000/admin/login](http://localhost:3000/admin/login) e 
 | `npm run check-env` | Verifica se as variáveis de ambiente estão configuradas |
 | `npm run scan-secrets` | Verifica se há chaves/tokens expostos no código |
 
-## Colunas da planilha
+## Planilha
 
-O parser aceita colunas em português ou inglês:
+O dashboard é **100% dinâmico**: envie qualquer planilha com os cabeçalhos que desejar. O sistema detecta automaticamente:
 
-| Planilha | Mapeamento |
-|---|---|
-| Campanha / Campaign | `campaign` |
-| Data / Date | `date` |
-| Investimento / Investment | `investment` |
-| Receita / Revenue | `revenue` |
-| Cliques / Clicks | `clicks` |
-| Impressões / Impressions | `impressions` |
-| Conversões / Conversions | `conversions` |
-| Status / Status | `status` |
-| Tipo / Type | `type` |
+- **Colunas numéricas** → cards de resumo (soma)
+- **Colunas categóricas** (≤ 15 valores únicos) → gráficos de distribuição
+- **Colunas de texto** com muitos valores → ranking (top N)
+- **Colunas de data** → gráfico de evolução entre períodos
+
+Não há mapeamento fixo de colunas — o conteúdo da planilha define os blocos exibidos.
 
 ## Troubleshooting
 
