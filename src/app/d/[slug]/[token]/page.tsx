@@ -7,7 +7,8 @@ import DonutCard from '@/components/DonutCard'
 import TopExpensesList from '@/components/TopExpensesList'
 import EvolutionChart from '@/components/EvolutionChart'
 import PeriodSelector from '@/components/PeriodSelector'
-import type { Widget, FinancialSummary } from '@/lib/metrics'
+import type { FinancialSummary } from '@/lib/metrics'
+import { detectMetricFormat, formatMetricValue } from '@/lib/formatMetric'
 
 interface Period {
   month: number
@@ -16,8 +17,11 @@ interface Period {
 }
 
 interface DashboardData {
-  financial: (FinancialSummary & { totalSpend: number; balance: number }) | null
-  widgets: Widget[]
+  financial: FinancialSummary
+  topCampaigns: { name: string; spend: number }[]
+  evolution: { period: string; spend: number }[]
+  rawDataColumns: string[]
+  campaignMetrics: Record<string, unknown>[]
   availablePeriods: Period[]
   currentPeriod: Period | null
 }
@@ -29,102 +33,108 @@ function formatCurrency(v: number) {
   })}`
 }
 
-function formatNumber(v: number) {
-  return v.toLocaleString('pt-BR')
+function SummaryCards({ financial }: { financial: FinancialSummary }) {
+  return (
+    <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <SummaryCard
+        title="Saldo do Período"
+        value={formatCurrency(financial.balance)}
+        color={financial.balance >= 0 ? 'positive' : 'negative'}
+      />
+      <SummaryCard
+        title="Total Recebido"
+        value={formatCurrency(financial.totalReceived)}
+        color="positive"
+      />
+      <SummaryCard
+        title="Total Gasto"
+        value={formatCurrency(financial.totalSpend)}
+        color="negative"
+      />
+      <SummaryCard
+        title="Pendências"
+        value={formatCurrency(financial.totalPendente)}
+        color={financial.totalPendente > 0 ? 'negative' : 'positive'}
+      />
+    </div>
+  )
 }
 
-function formatWidgetValue(widget: Widget & { type: 'summary' }): string {
-  return widget.format === 'currency' ? formatCurrency(widget.value) : formatNumber(widget.value)
+function DonutsSection({ financial }: { financial: FinancialSummary }) {
+  const receitaDespesa = [
+    { name: 'Receitas', value: financial.totalReceived },
+    { name: 'Despesas', value: financial.totalSpend },
+  ]
+
+  return (
+    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <DonutCard
+        title="Receitas vs Despesas"
+        data={receitaDespesa}
+        colors={['#5C5C5C', '#D4D4D4']}
+        formatValue={(v) => formatCurrency(v)}
+      />
+      <DonutCard
+        title="Fixas vs Variáveis"
+        data={financial.typeDistribution.length > 0 ? financial.typeDistribution : []}
+        colors={['#A0A0A0', '#2A2A2A']}
+        formatValue={(v) => formatCurrency(v)}
+      />
+      <DonutCard
+        title="Status Geral"
+        data={financial.statusDistribution.length > 0 ? financial.statusDistribution : []}
+        colors={['#5C5C5C', '#D4D4D4']}
+        formatValue={(v) => formatCurrency(v)}
+      />
+    </div>
+  )
 }
 
-function FinancialSection({ financial }: { financial: NonNullable<DashboardData['financial']> }) {
+function CampaignMetricsSection({
+  columns,
+  rows,
+}: {
+  columns: string[]
+  rows: Record<string, unknown>[]
+}) {
+  if (columns.length === 0 || rows.length === 0) return null
+
   return (
     <div className="mb-6">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-axium-muted">
-        Financeiro
+        Métricas de Campanha
       </h2>
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <SummaryCard
-          title="Total Gasto"
-          value={formatCurrency(financial.totalSpend)}
-          color="negative"
-        />
-        <SummaryCard
-          title="Total Recebido"
-          value={formatCurrency(financial.totalReceived)}
-          color="positive"
-        />
-        <SummaryCard
-          title="Saldo"
-          value={formatCurrency(financial.balance)}
-          color={financial.balance >= 0 ? 'positive' : 'negative'}
-        />
-        <SummaryCard
-          title="Pendente"
-          value={formatCurrency(financial.totalPendente)}
-          color={financial.totalPendente > 0 ? 'negative' : 'positive'}
-        />
+      <div className="overflow-x-auto rounded-xl border border-axium-border bg-axium-card">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-axium-border">
+              <th className="whitespace-nowrap px-4 py-3 font-semibold text-axium-muted">#</th>
+              {columns.map((col) => (
+                <th key={col} className="whitespace-nowrap px-4 py-3 font-semibold text-axium-muted">
+                  {col}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i} className="border-b border-axium-border last:border-b-0 hover:bg-axium-bg/40">
+                <td className="px-4 py-3 text-axium-neutral">{i + 1}</td>
+                {columns.map((col) => {
+                  const raw = row[col]
+                  const num = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(',', '.')) || 0
+                  const fmt = detectMetricFormat(col)
+                  return (
+                    <td key={col} className="whitespace-nowrap px-4 py-3 text-white">
+                      {formatMetricValue(num, fmt)}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      {financial.statusDistribution.length > 0 && (
-        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <DonutCard
-            title="Status de Pagamento"
-            data={financial.statusDistribution}
-            colors={['#D4D4D4', '#5C5C5C']}
-          />
-          {financial.typeDistribution.length > 0 && (
-            <DonutCard
-              title="Tipo de Despesa"
-              data={financial.typeDistribution}
-              colors={['#A0A0A0', '#2A2A2A']}
-            />
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function DonutGrid({ widgets }: { widgets: Widget[] }) {
-  const donuts = widgets.filter((w): w is Widget & { type: 'donut' } => w.type === 'donut')
-  if (donuts.length === 0) return null
-
-  return (
-    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {donuts.map((w) => (
-        <DonutCard key={w.title} title={w.title} data={w.data} colors={w.colors} />
-      ))}
-    </div>
-  )
-}
-
-function TopListsGrid({ widgets }: { widgets: Widget[] }) {
-  const lists = widgets.filter((w): w is Widget & { type: 'top-list' } => w.type === 'top-list')
-  if (lists.length === 0) return null
-
-  return (
-    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {lists.map((w) => (
-        <TopExpensesList
-          key={w.title}
-          title={w.title}
-          expenses={w.data}
-          formatValue={w.format === 'currency' ? formatCurrency : formatNumber}
-        />
-      ))}
-    </div>
-  )
-}
-
-function EvolutionSection({ widgets }: { widgets: Widget[] }) {
-  const evolutions = widgets.filter((w): w is Widget & { type: 'evolution' } => w.type === 'evolution')
-  if (evolutions.length === 0) return null
-
-  return (
-    <div className="mb-6">
-      {evolutions.map((w) => (
-        <EvolutionChart key={w.title} title={w.title} data={w.data} series={w.series} />
-      ))}
     </div>
   )
 }
@@ -210,9 +220,7 @@ export default function PublicDashboardPage() {
     )
   }
 
-  const { widgets, availablePeriods, financial } = data
-
-  const summaryWidgets = widgets.filter((w): w is Widget & { type: 'summary' } => w.type === 'summary')
+  const { financial, topCampaigns, evolution, rawDataColumns, campaignMetrics, availablePeriods } = data
 
   return (
     <div className="min-h-screen bg-axium-bg p-4 sm:p-6">
@@ -226,19 +234,30 @@ export default function PublicDashboardPage() {
           />
         </div>
 
-        {financial && <FinancialSection financial={financial} />}
+        {/* 1. 4 Summary Cards */}
+        <SummaryCards financial={financial} />
 
-        {summaryWidgets.length > 0 && (
-          <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            {summaryWidgets.map((w) => (
-              <SummaryCard key={w.title} title={w.title} value={formatWidgetValue(w)} color={w.color} />
-            ))}
-          </div>
-        )}
+        {/* 2. 3 Donuts */}
+        <DonutsSection financial={financial} />
 
-        <DonutGrid widgets={widgets} />
-        <TopListsGrid widgets={widgets} />
-        <EvolutionSection widgets={widgets} />
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* 3. Top 5 Despesas */}
+          <TopExpensesList
+            title="Top 5 Despesas"
+            expenses={topCampaigns.map((c) => ({ name: c.name, value: c.spend }))}
+            formatValue={(v) => formatCurrency(v)}
+          />
+
+          {/* 4. Evolução Mensal */}
+          <EvolutionChart
+            title="Evolução Mensal"
+            data={evolution}
+            series={[{ dataKey: 'spend', name: 'Gasto', color: '#D4D4D4' }]}
+          />
+        </div>
+
+        {/* 5. Métricas de Campanha */}
+        <CampaignMetricsSection columns={rawDataColumns} rows={campaignMetrics} />
       </div>
     </div>
   )

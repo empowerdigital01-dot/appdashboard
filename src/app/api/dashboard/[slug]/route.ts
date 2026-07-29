@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
-import { generateWidgets, computeFinancialSummary } from '@/lib/metrics'
+import { computeFinancialSummary, computeTopCampaigns, computeEvolution } from '@/lib/metrics'
 
 export async function GET(
   req: NextRequest,
@@ -31,7 +31,10 @@ export async function GET(
 
   const emptyResponse = {
     financial: null,
-    widgets: [],
+    topCampaigns: [],
+    evolution: [],
+    rawDataColumns: [],
+    campaignMetrics: [],
     availablePeriods: [],
     currentPeriod: null,
   }
@@ -76,16 +79,16 @@ export async function GET(
     return NextResponse.json(emptyResponse)
   }
 
-  // Fetch current period metrics with raw_data
+  // Fetch current period metrics
   const { data: currentMetrics } = await sb
     .from('metrics')
-    .select('campaign_name, report_date, spend, raw_data')
+    .select('campaign_name, spend, raw_data')
     .in('upload_id', currentUploadIds)
 
   // Fetch all periods metrics for evolution
   const { data: allMetrics } = await sb
     .from('metrics')
-    .select('campaign_name, report_date, spend, raw_data, upload_id')
+    .select('campaign_name, spend, raw_data, upload_id')
     .in('upload_id', uniqueUploadIds)
 
   // Fetch financial entries for current period
@@ -96,62 +99,76 @@ export async function GET(
     .eq('period_reference_month', currentPeriodMonth)
     .eq('period_reference_year', currentPeriodYear)
 
-  // Compute financial summary
-  const financial = financialEntries && financialEntries.length > 0
-    ? computeFinancialSummary(financialEntries)
-    : null
-
   // Compute total spend from current metrics
   const totalSpend = (currentMetrics || []).reduce(
     (sum, row) => sum + (parseFloat(row.spend) || 0),
     0
   )
 
-  // Extract raw_data rows for dynamic widget generation
-  const currentRawData: Record<string, unknown>[] = (currentMetrics || []).map((row) => ({
-    campaign_name: row.campaign_name,
-    report_date: row.report_date,
-    spend: row.spend,
-    ...(row.raw_data as Record<string, unknown> || {}),
-  }))
+  // Compute financial summary
+  const financial =
+    financialEntries && financialEntries.length > 0
+      ? computeFinancialSummary(financialEntries, totalSpend)
+      : {
+          totalSpend,
+          totalReceived: 0,
+          balance: -totalSpend,
+          totalPendente: 0,
+          statusDistribution: [],
+          typeDistribution: [],
+        }
+
+  // Top 5 campaigns by spend
+  const topCampaigns = computeTopCampaigns(currentMetrics || [])
 
   // Group all metrics by period for evolution
-  const metricsByPeriod = new Map<string, Record<string, unknown>[]>()
+  const metricsByPeriod = new Map<string, { spend: number }[]>()
   if (allMetrics) {
     for (const row of allMetrics) {
       for (const upload of allUploads) {
         if (upload.id === row.upload_id) {
           const key = `${upload.period_month}-${upload.period_year}`
-          if (!metricsByPeriod.has(key)) {
-            metricsByPeriod.set(key, [])
-          }
-          metricsByPeriod.get(key)!.push({
-            campaign_name: row.campaign_name,
-            report_date: row.report_date,
-            spend: row.spend,
-            ...(row.raw_data as Record<string, unknown> || {}),
-          })
+          if (!metricsByPeriod.has(key)) metricsByPeriod.set(key, [])
+          metricsByPeriod.get(key)!.push({ spend: parseFloat(row.spend) || 0 })
           break
         }
       }
     }
   }
 
-  const allPeriodsData = Array.from(metricsByPeriod.entries()).map(([key, rows]) => {
-    const [m, y] = key.split('-').map(Number)
-    return {
-      period: `${String(m).padStart(2, '0')}/${y}`,
-      rows,
+  const allPeriodsData = Array.from(metricsByPeriod.entries())
+    .map(([key, rows]) => {
+      const [m, y] = key.split('-').map(Number)
+      return { period: `${String(m).padStart(2, '0')}/${y}`, rows }
+    })
+    .sort((a, b) => {
+      const [am, ay] = a.period.split('/').map(Number)
+      const [bm, by] = b.period.split('/').map(Number)
+      return ay !== by ? ay - by : am - bm
+    })
+
+  const evolution = computeEvolution(allPeriodsData)
+
+  // CampaignMetrics: raw_data rows for the "Métricas de Campanha" section
+  const rawDataColumns: string[] = []
+  const campaignMetrics: Record<string, unknown>[] = []
+  if (currentMetrics && currentMetrics.length > 0) {
+    const EXCLUDED_COLS = new Set(['campaign_name', 'report_date', 'spend'])
+    const firstRow = currentMetrics[0].raw_data as Record<string, unknown> | null
+    if (firstRow) {
+      for (const col of Object.keys(firstRow)) {
+        if (!EXCLUDED_COLS.has(col)) rawDataColumns.push(col)
+      }
     }
-  })
-
-  allPeriodsData.sort((a, b) => {
-    const [am, ay] = a.period.split('/').map(Number)
-    const [bm, by] = b.period.split('/').map(Number)
-    return ay !== by ? ay - by : am - bm
-  })
-
-  const widgets = generateWidgets(currentRawData, allPeriodsData)
+    for (const row of currentMetrics) {
+      const rd = (row.raw_data as Record<string, unknown>) || {}
+      const entry: Record<string, unknown> = {}
+      for (const col of rawDataColumns) {
+        entry[col] = rd[col]
+      }
+      campaignMetrics.push(entry)
+    }
+  }
 
   // Build available periods
   const uploadPeriodMap = new Map<string, { month: number; year: number }>()
@@ -175,10 +192,11 @@ export async function GET(
     }))
 
   return NextResponse.json({
-    financial: financial
-      ? { ...financial, totalSpend, balance: financial.totalReceived - totalSpend }
-      : null,
-    widgets,
+    financial,
+    topCampaigns,
+    evolution,
+    rawDataColumns,
+    campaignMetrics,
     availablePeriods: uniquePeriods,
     currentPeriod:
       month && year
