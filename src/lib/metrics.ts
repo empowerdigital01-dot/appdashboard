@@ -33,6 +33,22 @@ interface EvolutionWidget {
 
 export type Widget = SummaryWidget | DonutWidget | TopListWidget | EvolutionWidget
 
+const DISPLAY_NAMES: Record<string, string> = {
+  campaign: 'Campanha',
+  date: 'Data',
+  investment: 'Investimento',
+  revenue: 'Receita',
+  clicks: 'Cliques',
+  impressions: 'Impressões',
+  conversions: 'Conversões',
+  status: 'Status',
+  type: 'Tipo',
+}
+
+function displayName(col: string): string {
+  return DISPLAY_NAMES[col] || col
+}
+
 function detectNumericColumns(rows: Record<string, unknown>[]): string[] {
   if (rows.length === 0) return []
   const candidates = Object.keys(rows[0])
@@ -108,7 +124,7 @@ export function generateWidgets(
 
     widgets.push({
       type: 'summary',
-      title: col,
+      title: displayName(col),
       value: s.sum,
       format: 'currency',
       color,
@@ -131,7 +147,7 @@ export function generateWidgets(
 
     widgets.push({
       type: 'donut',
-      title: col,
+      title: displayName(col),
       data: slices,
       colors: DONUT_COLORS,
     })
@@ -165,7 +181,7 @@ export function generateWidgets(
       if (topItems.length >= 2) {
         widgets.push({
           type: 'top-list',
-          title: `Top ${groupCol} por ${numCol}`,
+          title: `Top ${displayName(groupCol)} por ${displayName(numCol)}`,
           data: topItems,
           format: 'currency',
         })
@@ -196,7 +212,7 @@ export function generateWidgets(
 
     const series = colsToShow.map((col, i) => ({
       dataKey: col,
-      name: col,
+      name: displayName(col),
       color: EVOLUTION_COLORS[i % EVOLUTION_COLORS.length],
     }))
 

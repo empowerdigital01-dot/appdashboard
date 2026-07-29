@@ -28,12 +28,20 @@ CREATE TABLE IF NOT EXISTS uploads (
 CREATE INDEX IF NOT EXISTS idx_uploads_account_id ON uploads(account_id);
 
 -- ============================================
--- Tabela: metrics (dinâmica — colunas definidas pela planilha)
+-- Tabela: metrics
 -- ============================================
 CREATE TABLE IF NOT EXISTS metrics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   upload_id UUID NOT NULL REFERENCES uploads(id) ON DELETE CASCADE,
-  data JSONB NOT NULL DEFAULT '{}'
+  campaign TEXT NOT NULL DEFAULT '',
+  date DATE,
+  investment NUMERIC(12,2) NOT NULL DEFAULT 0,
+  revenue NUMERIC(12,2) NOT NULL DEFAULT 0,
+  clicks INT NOT NULL DEFAULT 0,
+  impressions INT NOT NULL DEFAULT 0,
+  conversions INT NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT '',
+  type TEXT NOT NULL DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_metrics_upload_id ON metrics(upload_id);

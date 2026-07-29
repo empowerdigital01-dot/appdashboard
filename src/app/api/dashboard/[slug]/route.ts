@@ -71,15 +71,15 @@ export async function GET(
 
   const { data: currentMetrics } = await sb
     .from('metrics')
-    .select('data')
+    .select('campaign, date, investment, revenue, clicks, impressions, conversions, status, type')
     .in('upload_id', currentUploadIds)
 
   const { data: allMetrics } = await sb
     .from('metrics')
-    .select('data, upload_id')
+    .select('campaign, date, investment, revenue, clicks, impressions, conversions, status, type, upload_id')
     .in('upload_id', uniqueUploadIds)
 
-  const currentRows = (currentMetrics || []).map((m) => m.data as Record<string, unknown>)
+  const currentRows = (currentMetrics || []) as unknown as Record<string, unknown>[]
 
   const metricsByPeriod = new Map<string, Record<string, unknown>[]>()
   if (allMetrics) {
@@ -90,7 +90,8 @@ export async function GET(
           if (!metricsByPeriod.has(key)) {
             metricsByPeriod.set(key, [])
           }
-          metricsByPeriod.get(key)!.push(row.data as Record<string, unknown>)
+          const { upload_id, ...rest } = row
+          metricsByPeriod.get(key)!.push(rest as Record<string, unknown>)
           break
         }
       }

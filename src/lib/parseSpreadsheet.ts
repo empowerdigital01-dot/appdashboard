@@ -1,5 +1,29 @@
 import * as XLSX from 'xlsx'
 
+const COLUMN_MAP: Record<string, string> = {
+  'campanha': 'campaign',
+  'campaign': 'campaign',
+  'data': 'date',
+  'date': 'date',
+  'investimento': 'investment',
+  'investment': 'investment',
+  'receita': 'revenue',
+  'revenue': 'revenue',
+  'cliques': 'clicks',
+  'clicks': 'clicks',
+  'impressões': 'impressions',
+  'impressoes': 'impressions',
+  'impressions': 'impressions',
+  'conversões': 'conversions',
+  'conversoes': 'conversions',
+  'conversions': 'conversions',
+  'status': 'status',
+  'tipo': 'type',
+  'type': 'type',
+}
+
+const REQUIRED_COLUMNS = ['campanha', 'data', 'investimento', 'receita', 'status', 'tipo']
+
 export function parseSpreadsheet(buffer: ArrayBuffer): Record<string, unknown>[] {
   const workbook = XLSX.read(buffer, { type: 'array' })
   const sheetName = workbook.SheetNames[0]
@@ -14,38 +38,29 @@ export function parseSpreadsheet(buffer: ArrayBuffer): Record<string, unknown>[]
     throw new Error('Planilha vazia — nenhuma linha de dados')
   }
 
-  return rawData
-}
+  const headers = Object.keys(rawData[0])
+  const normalizedHeaders = headers.map((h) => h.toLowerCase().trim())
+  const mappedHeaders = normalizedHeaders.map((h) => COLUMN_MAP[h] || null)
 
-export function inferColumnTypes(rows: Record<string, unknown>[]): Record<string, string> {
-  if (rows.length === 0) return {}
-
-  const columns = Object.keys(rows[0])
-  const types: Record<string, string> = {}
-
-  for (const col of columns) {
-    const values = rows.map((r) => r[col]).filter((v) => v !== '' && v !== undefined && v !== null)
-    if (values.length === 0) {
-      types[col] = 'text'
-      continue
-    }
-
-    const numericCount = values.filter((v) => !isNaN(Number(v)) && v !== true && v !== false).length
-    if (numericCount === values.length) {
-      types[col] = 'numeric'
-      continue
-    }
-
-    const dateCount = values.filter((v) => !isNaN(new Date(String(v)).getTime())).length
-    if (dateCount === values.length) {
-      types[col] = 'date'
-      continue
-    }
-
-    types[col] = 'text'
+  const missing = REQUIRED_COLUMNS.filter((col) => !normalizedHeaders.includes(col))
+  if (missing.length > 0) {
+    throw new Error(
+      `Colunas obrigatórias ausentes: ${missing
+        .map((m) => m.charAt(0).toUpperCase() + m.slice(1))
+        .join(', ')}`
+    )
   }
 
-  return types
+  return rawData.map((row) => {
+    const mapped: Record<string, unknown> = {}
+    headers.forEach((header, i) => {
+      const field = mappedHeaders[i]
+      if (field) {
+        mapped[field] = row[header]
+      }
+    })
+    return mapped
+  })
 }
 
 export function parseNumber(value: unknown): number {
