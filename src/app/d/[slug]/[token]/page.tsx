@@ -7,7 +7,7 @@ import DonutCard from '@/components/DonutCard'
 import TopExpensesList from '@/components/TopExpensesList'
 import EvolutionChart from '@/components/EvolutionChart'
 import PeriodSelector from '@/components/PeriodSelector'
-import type { DashboardMetrics } from '@/lib/metrics'
+import type { Widget } from '@/lib/metrics'
 
 interface Period {
   month: number
@@ -16,9 +16,68 @@ interface Period {
 }
 
 interface DashboardData {
-  metrics: DashboardMetrics
+  widgets: Widget[]
   availablePeriods: Period[]
   currentPeriod: Period | null
+}
+
+function formatCurrency(v: number) {
+  return `R$ ${v.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+function formatNumber(v: number) {
+  return v.toLocaleString('pt-BR')
+}
+
+function formatWidgetValue(widget: Widget & { type: 'summary' }): string {
+  return widget.format === 'currency' ? formatCurrency(widget.value) : formatNumber(widget.value)
+}
+
+function DonutGrid({ widgets }: { widgets: Widget[] }) {
+  const donuts = widgets.filter((w): w is Widget & { type: 'donut' } => w.type === 'donut')
+  if (donuts.length === 0) return null
+
+  return (
+    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {donuts.map((w) => (
+        <DonutCard key={w.title} title={w.title} data={w.data} colors={w.colors} />
+      ))}
+    </div>
+  )
+}
+
+function TopListsGrid({ widgets }: { widgets: Widget[] }) {
+  const lists = widgets.filter((w): w is Widget & { type: 'top-list' } => w.type === 'top-list')
+  if (lists.length === 0) return null
+
+  return (
+    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {lists.map((w) => (
+        <TopExpensesList
+          key={w.title}
+          title={w.title}
+          expenses={w.data}
+          formatValue={w.format === 'currency' ? formatCurrency : formatNumber}
+        />
+      ))}
+    </div>
+  )
+}
+
+function EvolutionSection({ widgets }: { widgets: Widget[] }) {
+  const evolutions = widgets.filter((w): w is Widget & { type: 'evolution' } => w.type === 'evolution')
+  if (evolutions.length === 0) return null
+
+  return (
+    <div className="mb-6">
+      {evolutions.map((w) => (
+        <EvolutionChart key={w.title} title={w.title} data={w.data} series={w.series} />
+      ))}
+    </div>
+  )
 }
 
 export default function PublicDashboardPage() {
@@ -102,14 +161,9 @@ export default function PublicDashboardPage() {
     )
   }
 
-  const { metrics, availablePeriods } = data
+  const { widgets, availablePeriods } = data
 
-  function formatCurrency(v: number) {
-    return `R$ ${v.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`
-  }
+  const summaryWidgets = widgets.filter((w): w is Widget & { type: 'summary' } => w.type === 'summary')
 
   return (
     <div className="min-h-screen bg-axium-bg p-4 sm:p-6">
@@ -123,55 +177,17 @@ export default function PublicDashboardPage() {
           />
         </div>
 
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <SummaryCard
-            title="Saldo do Período"
-            value={formatCurrency(metrics.saldoPeriodo)}
-            color={metrics.saldoPeriodo >= 0 ? 'positive' : 'negative'}
-          />
-          <SummaryCard
-            title="Total Recebido"
-            value={formatCurrency(metrics.totalRecebido)}
-            color="positive"
-          />
-          <SummaryCard
-            title="Total Gasto"
-            value={formatCurrency(metrics.totalGasto)}
-            color="negative"
-          />
-          <SummaryCard
-            title="Pendências"
-            value={formatCurrency(metrics.totalPendente)}
-            color="attention"
-          />
-        </div>
-
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <DonutCard
-            title="Receitas vs Despesas"
-            data={metrics.donutReceitasDespesas}
-            colors={['#D4D4D4', '#5C5C5C']}
-          />
-          <DonutCard
-            title="Fixas vs Variáveis"
-            data={metrics.donutFixasVariaveis}
-            colors={['#A0A0A0', '#B8B8B8']}
-          />
-          <DonutCard
-            title="Status Geral"
-            data={metrics.donutStatus}
-            colors={['#D4D4D4', '#A0A0A0', '#5C5C5C', '#B8B8B8']}
-          />
-        </div>
-
-        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-1">
-            <TopExpensesList expenses={metrics.topExpenses} />
+        {summaryWidgets.length > 0 && (
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            {summaryWidgets.map((w) => (
+              <SummaryCard key={w.title} title={w.title} value={formatWidgetValue(w)} color={w.color} />
+            ))}
           </div>
-          <div className="lg:col-span-2">
-            <EvolutionChart data={metrics.evolutionData} />
-          </div>
-        </div>
+        )}
+
+        <DonutGrid widgets={widgets} />
+        <TopListsGrid widgets={widgets} />
+        <EvolutionSection widgets={widgets} />
       </div>
     </div>
   )

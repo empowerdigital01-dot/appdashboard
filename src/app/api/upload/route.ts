@@ -76,15 +76,7 @@ export async function POST(req: NextRequest) {
 
     const metricsData = rows.map((row) => ({
       upload_id: upload.id,
-      campaign: row.campaign,
-      date: row.date,
-      investment: row.investment,
-      revenue: row.revenue,
-      clicks: row.clicks,
-      impressions: row.impressions,
-      conversions: row.conversions,
-      status: row.status,
-      type: row.type,
+      data: row,
     }))
 
     const { error: metricsError } = await getSupabaseAdmin()

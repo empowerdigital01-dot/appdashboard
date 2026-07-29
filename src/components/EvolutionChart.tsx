@@ -9,23 +9,17 @@ import {
   Legend,
 } from 'recharts'
 
-interface EvolutionData {
-  period: string
-  investment: number
-  revenue: number
-}
-
 interface EvolutionChartProps {
-  data: EvolutionData[]
+  title?: string
+  data: Record<string, string | number>[]
+  series: { dataKey: string; name: string; color: string }[]
 }
 
-export default function EvolutionChart({ data }: EvolutionChartProps) {
+export default function EvolutionChart({ title = 'Evolução', data, series }: EvolutionChartProps) {
   if (data.length === 0) {
     return (
       <div className="rounded-xl border border-axium-border bg-axium-card p-4 sm:p-5">
-        <h3 className="mb-4 text-sm font-semibold text-axium-muted">
-          Evolução Mensal
-        </h3>
+        <h3 className="mb-4 text-sm font-semibold text-axium-muted">{title}</h3>
         <p className="text-sm text-axium-neutral">Nenhum período anterior disponível</p>
       </div>
     )
@@ -33,9 +27,7 @@ export default function EvolutionChart({ data }: EvolutionChartProps) {
 
   return (
     <div className="rounded-xl border border-axium-border bg-axium-card p-4 sm:p-5">
-      <h3 className="mb-4 text-sm font-semibold text-axium-muted">
-        Evolução Mensal
-      </h3>
+      <h3 className="mb-4 text-sm font-semibold text-axium-muted">{title}</h3>
       <div className="h-64 sm:h-72">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} barGap={4}>
@@ -65,21 +57,16 @@ export default function EvolutionChart({ data }: EvolutionChartProps) {
                 `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
               }
             />
-            <Legend
-              wrapperStyle={{ fontSize: 12, color: '#9A9A9A' }}
-            />
-            <Bar
-              dataKey="investment"
-              name="Investimento"
-              fill="#5C5C5C"
-              radius={[4, 4, 0, 0]}
-            />
-            <Bar
-              dataKey="revenue"
-              name="Receita"
-              fill="#D4D4D4"
-              radius={[4, 4, 0, 0]}
-            />
+            <Legend wrapperStyle={{ fontSize: 12, color: '#9A9A9A' }} />
+            {series.map((s) => (
+              <Bar
+                key={s.dataKey}
+                dataKey={s.dataKey}
+                name={s.name}
+                fill={s.color}
+                radius={[4, 4, 0, 0]}
+              />
+            ))}
           </BarChart>
         </ResponsiveContainer>
       </div>

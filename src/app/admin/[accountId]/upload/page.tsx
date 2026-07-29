@@ -121,7 +121,7 @@ export default function UploadPage() {
               className="w-full text-sm text-axium-muted file:mr-3 file:rounded file:border-0 file:bg-axium-border file:px-3 file:py-2 file:text-sm file:text-white hover:file:bg-axium-negative"
             />
             <p className="mt-1 text-xs text-axium-neutral">
-              Colunas esperadas: Campanha, Data, Investimento, Receita, Cliques, Impressões, Conversões, Status, Tipo
+              O dashboard se adapta automaticamente às colunas da sua planilha. Colunas numéricas viram cards de resumo, colunas categóricas viram gráficos.
             </p>
           </div>
 
