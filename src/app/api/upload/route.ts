@@ -74,17 +74,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const metricsData = rows.map((row: Record<string, unknown>) => ({
+    const metricsData = rows.map((row) => ({
       upload_id: upload.id,
-      campaign: row.campaign ?? '',
-      date: row.date ?? '',
-      investment: parseFloat(String(row.investment ?? 0)),
-      revenue: parseFloat(String(row.revenue ?? 0)),
-      clicks: parseInt(String(row.clicks ?? 0), 10),
-      impressions: parseInt(String(row.impressions ?? 0), 10),
-      conversions: parseInt(String(row.conversions ?? 0), 10),
-      status: row.status ?? '',
-      type: row.type ?? '',
+      account_id: accountId,
+      campaign_name: row.campaign_name,
+      report_date: row.report_date || null,
+      spend: row.spend,
+      raw_data: row.raw_data,
     }))
 
     const { error: metricsError } = await getSupabaseAdmin()

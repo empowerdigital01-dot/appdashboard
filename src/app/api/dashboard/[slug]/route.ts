@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
-import { generateWidgets } from '@/lib/metrics'
+import { generateWidgets, computeFinancialSummary } from '@/lib/metrics'
 
 export async function GET(
   req: NextRequest,
@@ -30,6 +30,7 @@ export async function GET(
   const year = req.nextUrl.searchParams.get('year')
 
   const emptyResponse = {
+    financial: null,
     widgets: [],
     availablePeriods: [],
     currentPeriod: null,
@@ -54,13 +55,19 @@ export async function GET(
   const uniqueUploadIds = Array.from(latestByPeriod.values())
 
   let currentUploadIds: string[]
+  let currentPeriodMonth: number
+  let currentPeriodYear: number
   if (month && year) {
-    const key = `${parseInt(month, 10)}-${parseInt(year, 10)}`
+    currentPeriodMonth = parseInt(month, 10)
+    currentPeriodYear = parseInt(year, 10)
+    const key = `${currentPeriodMonth}-${currentPeriodYear}`
     const uploadId = latestByPeriod.get(key)
     currentUploadIds = uploadId ? [uploadId] : []
   } else {
     const lastUpload = allUploads[allUploads.length - 1]
-    const lastKey = `${lastUpload.period_month}-${lastUpload.period_year}`
+    currentPeriodMonth = lastUpload.period_month
+    currentPeriodYear = lastUpload.period_year
+    const lastKey = `${currentPeriodMonth}-${currentPeriodYear}`
     const latestId = latestByPeriod.get(lastKey)
     currentUploadIds = latestId ? [latestId] : []
   }
@@ -69,18 +76,46 @@ export async function GET(
     return NextResponse.json(emptyResponse)
   }
 
+  // Fetch current period metrics with raw_data
   const { data: currentMetrics } = await sb
     .from('metrics')
-    .select('campaign, date, investment, revenue, clicks, impressions, conversions, status, type')
+    .select('campaign_name, report_date, spend, raw_data')
     .in('upload_id', currentUploadIds)
 
+  // Fetch all periods metrics for evolution
   const { data: allMetrics } = await sb
     .from('metrics')
-    .select('campaign, date, investment, revenue, clicks, impressions, conversions, status, type, upload_id')
+    .select('campaign_name, report_date, spend, raw_data, upload_id')
     .in('upload_id', uniqueUploadIds)
 
-  const currentRows = (currentMetrics || []) as unknown as Record<string, unknown>[]
+  // Fetch financial entries for current period
+  const { data: financialEntries } = await sb
+    .from('financial_entries')
+    .select('total_received, payment_status, expense_type')
+    .eq('account_id', account.id)
+    .eq('period_reference_month', currentPeriodMonth)
+    .eq('period_reference_year', currentPeriodYear)
 
+  // Compute financial summary
+  const financial = financialEntries && financialEntries.length > 0
+    ? computeFinancialSummary(financialEntries)
+    : null
+
+  // Compute total spend from current metrics
+  const totalSpend = (currentMetrics || []).reduce(
+    (sum, row) => sum + (parseFloat(row.spend) || 0),
+    0
+  )
+
+  // Extract raw_data rows for dynamic widget generation
+  const currentRawData: Record<string, unknown>[] = (currentMetrics || []).map((row) => ({
+    campaign_name: row.campaign_name,
+    report_date: row.report_date,
+    spend: row.spend,
+    ...(row.raw_data as Record<string, unknown> || {}),
+  }))
+
+  // Group all metrics by period for evolution
   const metricsByPeriod = new Map<string, Record<string, unknown>[]>()
   if (allMetrics) {
     for (const row of allMetrics) {
@@ -90,8 +125,12 @@ export async function GET(
           if (!metricsByPeriod.has(key)) {
             metricsByPeriod.set(key, [])
           }
-          const { upload_id, ...rest } = row
-          metricsByPeriod.get(key)!.push(rest as Record<string, unknown>)
+          metricsByPeriod.get(key)!.push({
+            campaign_name: row.campaign_name,
+            report_date: row.report_date,
+            spend: row.spend,
+            ...(row.raw_data as Record<string, unknown> || {}),
+          })
           break
         }
       }
@@ -112,8 +151,9 @@ export async function GET(
     return ay !== by ? ay - by : am - bm
   })
 
-  const widgets = generateWidgets(currentRows, allPeriodsData)
+  const widgets = generateWidgets(currentRawData, allPeriodsData)
 
+  // Build available periods
   const uploadPeriodMap = new Map<string, { month: number; year: number }>()
   for (const upload of allUploads) {
     const key = `${upload.period_month}-${upload.period_year}`
@@ -135,11 +175,14 @@ export async function GET(
     }))
 
   return NextResponse.json({
+    financial: financial
+      ? { ...financial, totalSpend, balance: financial.totalReceived - totalSpend }
+      : null,
     widgets,
     availablePeriods: uniquePeriods,
     currentPeriod:
       month && year
-        ? { month: parseInt(month, 10), year: parseInt(year, 10) }
+        ? { month: currentPeriodMonth, year: currentPeriodYear }
         : uniquePeriods[uniquePeriods.length - 1] || null,
   })
 }

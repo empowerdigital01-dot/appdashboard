@@ -7,7 +7,7 @@ import DonutCard from '@/components/DonutCard'
 import TopExpensesList from '@/components/TopExpensesList'
 import EvolutionChart from '@/components/EvolutionChart'
 import PeriodSelector from '@/components/PeriodSelector'
-import type { Widget } from '@/lib/metrics'
+import type { Widget, FinancialSummary } from '@/lib/metrics'
 
 interface Period {
   month: number
@@ -16,6 +16,7 @@ interface Period {
 }
 
 interface DashboardData {
+  financial: (FinancialSummary & { totalSpend: number; balance: number }) | null
   widgets: Widget[]
   availablePeriods: Period[]
   currentPeriod: Period | null
@@ -34,6 +35,54 @@ function formatNumber(v: number) {
 
 function formatWidgetValue(widget: Widget & { type: 'summary' }): string {
   return widget.format === 'currency' ? formatCurrency(widget.value) : formatNumber(widget.value)
+}
+
+function FinancialSection({ financial }: { financial: NonNullable<DashboardData['financial']> }) {
+  return (
+    <div className="mb-6">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-axium-muted">
+        Financeiro
+      </h2>
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <SummaryCard
+          title="Total Gasto"
+          value={formatCurrency(financial.totalSpend)}
+          color="negative"
+        />
+        <SummaryCard
+          title="Total Recebido"
+          value={formatCurrency(financial.totalReceived)}
+          color="positive"
+        />
+        <SummaryCard
+          title="Saldo"
+          value={formatCurrency(financial.balance)}
+          color={financial.balance >= 0 ? 'positive' : 'negative'}
+        />
+        <SummaryCard
+          title="Pendente"
+          value={formatCurrency(financial.totalPendente)}
+          color={financial.totalPendente > 0 ? 'negative' : 'positive'}
+        />
+      </div>
+      {financial.statusDistribution.length > 0 && (
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <DonutCard
+            title="Status de Pagamento"
+            data={financial.statusDistribution}
+            colors={['#D4D4D4', '#5C5C5C']}
+          />
+          {financial.typeDistribution.length > 0 && (
+            <DonutCard
+              title="Tipo de Despesa"
+              data={financial.typeDistribution}
+              colors={['#A0A0A0', '#2A2A2A']}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function DonutGrid({ widgets }: { widgets: Widget[] }) {
@@ -161,7 +210,7 @@ export default function PublicDashboardPage() {
     )
   }
 
-  const { widgets, availablePeriods } = data
+  const { widgets, availablePeriods, financial } = data
 
   const summaryWidgets = widgets.filter((w): w is Widget & { type: 'summary' } => w.type === 'summary')
 
@@ -176,6 +225,8 @@ export default function PublicDashboardPage() {
             onChange={handlePeriodChange}
           />
         </div>
+
+        {financial && <FinancialSection financial={financial} />}
 
         {summaryWidgets.length > 0 && (
           <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">

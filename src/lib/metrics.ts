@@ -2,6 +2,15 @@ import { parseNumber } from './parseSpreadsheet'
 
 const DONUT_COLORS = ['#D4D4D4', '#5C5C5C', '#A0A0A0', '#B8B8B8', '#2A2A2A', '#7A7A7A', '#E0E0E0', '#3A3A3A', '#C0C0C0', '#909090', '#1A1A1A', '#F0F0F0']
 
+export interface FinancialSummary {
+  totalSpend: number
+  totalReceived: number
+  balance: number
+  totalPendente: number
+  statusDistribution: { name: string; value: number }[]
+  typeDistribution: { name: string; value: number }[]
+}
+
 interface SummaryWidget {
   type: 'summary'
   title: string
@@ -33,20 +42,33 @@ interface EvolutionWidget {
 
 export type Widget = SummaryWidget | DonutWidget | TopListWidget | EvolutionWidget
 
-const DISPLAY_NAMES: Record<string, string> = {
-  campaign: 'Campanha',
-  date: 'Data',
-  investment: 'Investimento',
-  revenue: 'Receita',
-  clicks: 'Cliques',
-  impressions: 'Impressões',
-  conversions: 'Conversões',
-  status: 'Status',
-  type: 'Tipo',
-}
+export function computeFinancialSummary(entries: {
+  total_received: number
+  payment_status: string
+  expense_type: string
+}[]): FinancialSummary {
+  const totalReceived = entries.reduce((s, e) => s + e.total_received, 0)
+  const totalPendente = entries
+    .filter((e) => e.payment_status === 'pendente')
+    .reduce((s, e) => s + e.total_received, 0)
 
-function displayName(col: string): string {
-  return DISPLAY_NAMES[col] || col
+  const statusCounts: Record<string, number> = {}
+  const typeCounts: Record<string, number> = {}
+  for (const e of entries) {
+    const st = e.payment_status === 'pago' ? 'Pago' : 'Pendente'
+    statusCounts[st] = (statusCounts[st] || 0) + e.total_received
+    const tp = e.expense_type === 'fixa' ? 'Fixa' : 'Variável'
+    typeCounts[tp] = (typeCounts[tp] || 0) + e.total_received
+  }
+
+  return {
+    totalSpend: 0,
+    totalReceived,
+    balance: 0,
+    totalPendente,
+    statusDistribution: Object.entries(statusCounts).map(([name, value]) => ({ name, value })),
+    typeDistribution: Object.entries(typeCounts).map(([name, value]) => ({ name, value })),
+  }
 }
 
 function detectNumericColumns(rows: Record<string, unknown>[]): string[] {
@@ -58,22 +80,10 @@ function detectNumericColumns(rows: Record<string, unknown>[]): string[] {
   })
 }
 
-function detectDateColumns(rows: Record<string, unknown>[]): string[] {
-  if (rows.length === 0) return []
-  const candidates = Object.keys(rows[0])
-  return candidates.filter((col) => {
-    const vals = rows.map((r) => r[col]).filter((v) => v !== '' && v !== undefined && v !== null)
-    if (vals.length === 0) return false
-    return vals.every((v) => !isNaN(new Date(String(v)).getTime()))
-  })
-}
-
 function detectTextColumns(rows: Record<string, unknown>[]): string[] {
   const numericCols = detectNumericColumns(rows)
-  const dateCols = detectDateColumns(rows)
-  return Object.keys(rows[0]).filter(
-    (col) => !numericCols.includes(col) && !dateCols.includes(col)
-  )
+  const allCols = Object.keys(rows[0])
+  return allCols.filter((col) => !numericCols.includes(col))
 }
 
 function getUniqueValues(rows: Record<string, unknown>[], col: string): Map<string, number> {
@@ -124,45 +134,34 @@ export function generateWidgets(
 
     widgets.push({
       type: 'summary',
-      title: displayName(col),
+      title: col,
       value: s.sum,
       format: 'currency',
       color,
     })
   }
 
-  // 2. Donut charts for categorical columns (text cols with ≤ 15 unique values)
+  // 2. Donut charts for categorical columns (≤ 15 unique values)
   for (const col of textCols) {
     const uniqueVals = getUniqueValues(currentRows, col)
     if (uniqueVals.size <= 1) continue
     if (uniqueVals.size > 15) continue
 
-    const total = Array.from(uniqueVals.values()).reduce((a, b) => a + b, 0)
     const slices = Array.from(uniqueVals.entries())
-      .map(([name, count]) => ({
-        name,
-        value: count,
-      }))
+      .map(([name, count]) => ({ name, value: count }))
       .sort((a, b) => b.value - a.value)
 
     widgets.push({
       type: 'donut',
-      title: displayName(col),
+      title: col,
       data: slices,
       colors: DONUT_COLORS,
     })
   }
 
-  // 3. Top-N lists for text columns paired with numeric columns
-  // 3a. First try: find text columns with many unique values (potential grouping keys)
-  const multiValueCols = textCols.filter((col) => {
-    const uniqueVals = getUniqueValues(currentRows, col)
-    return uniqueVals.size >= 2
-  })
-
-  for (const groupCol of multiValueCols) {
+  // 3. Top-N lists (text columns with many values × first numeric column)
+  for (const groupCol of textCols) {
     const uniqueVals = getUniqueValues(currentRows, groupCol)
-    if (uniqueVals.size <= 1) continue
     if (uniqueVals.size <= 15) continue
 
     for (const numCol of numericCols) {
@@ -181,7 +180,7 @@ export function generateWidgets(
       if (topItems.length >= 2) {
         widgets.push({
           type: 'top-list',
-          title: `Top ${displayName(groupCol)} por ${displayName(numCol)}`,
+          title: `Top ${groupCol} por ${numCol}`,
           data: topItems,
           format: 'currency',
         })
@@ -212,7 +211,7 @@ export function generateWidgets(
 
     const series = colsToShow.map((col, i) => ({
       dataKey: col,
-      name: displayName(col),
+      name: col,
       color: EVOLUTION_COLORS[i % EVOLUTION_COLORS.length],
     }))
 

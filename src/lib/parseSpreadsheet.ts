@@ -1,30 +1,49 @@
 import * as XLSX from 'xlsx'
 
-const COLUMN_MAP: Record<string, string> = {
-  'campanha': 'campaign',
-  'campaign': 'campaign',
-  'data': 'date',
-  'date': 'date',
-  'investimento': 'investment',
-  'investment': 'investment',
-  'receita': 'revenue',
-  'revenue': 'revenue',
-  'cliques': 'clicks',
-  'clicks': 'clicks',
-  'impressões': 'impressions',
-  'impressoes': 'impressions',
-  'impressions': 'impressions',
-  'conversões': 'conversions',
-  'conversoes': 'conversions',
-  'conversions': 'conversions',
-  'status': 'status',
-  'tipo': 'type',
-  'type': 'type',
+export interface ParsedRow {
+  campaign_name: string
+  report_date: string
+  spend: number
+  raw_data: Record<string, unknown>
 }
 
-const REQUIRED_COLUMNS = ['campanha', 'data', 'investimento', 'receita', 'status', 'tipo']
+function findHeaderIndex(
+  headers: string[],
+  patterns: string[]
+): number {
+  for (const h of headers) {
+    const lower = h.toLowerCase().trim()
+    for (const p of patterns) {
+      if (lower.includes(p)) return headers.indexOf(h)
+    }
+  }
+  return -1
+}
 
-export function parseSpreadsheet(buffer: ArrayBuffer): Record<string, unknown>[] {
+const DATE_PATTERNS = [
+  'início dos relatórios', 'inicio dos relatorios',
+  'reporting starts', 'data de início',
+  'data', 'date', 'start',
+  'início', 'inicio',
+]
+
+const CAMPAIGN_PATTERNS = [
+  'nome do anúncio', 'nome do anuncio',
+  'nome da campanha',
+  'campanha', 'campaign',
+  'ad name', 'campaign name',
+  'anúncio', 'anuncio',
+]
+
+const SPEND_PATTERNS = [
+  'valor usado (brl)', 'valor usado',
+  'amount spent (brl)', 'amount spent',
+  'investimento', 'investment',
+  'spend', 'custo',
+  'gasto',
+]
+
+export function parseSpreadsheet(buffer: ArrayBuffer): ParsedRow[] {
   const workbook = XLSX.read(buffer, { type: 'array' })
   const sheetName = workbook.SheetNames[0]
   if (!sheetName) {
@@ -39,27 +58,34 @@ export function parseSpreadsheet(buffer: ArrayBuffer): Record<string, unknown>[]
   }
 
   const headers = Object.keys(rawData[0])
-  const normalizedHeaders = headers.map((h) => h.toLowerCase().trim())
-  const mappedHeaders = normalizedHeaders.map((h) => COLUMN_MAP[h] || null)
+  const dateIdx = findHeaderIndex(headers, DATE_PATTERNS)
+  const campaignIdx = findHeaderIndex(headers, CAMPAIGN_PATTERNS)
+  const spendIdx = findHeaderIndex(headers, SPEND_PATTERNS)
 
-  const missing = REQUIRED_COLUMNS.filter((col) => !normalizedHeaders.includes(col))
-  if (missing.length > 0) {
+  const notFound: string[] = []
+  if (dateIdx === -1) notFound.push('data')
+  if (campaignIdx === -1) notFound.push('nome da campanha/anúncio')
+  if (spendIdx === -1) notFound.push('investimento/valor usado')
+
+  if (notFound.length > 0) {
     throw new Error(
-      `Colunas obrigatórias ausentes: ${missing
-        .map((m) => m.charAt(0).toUpperCase() + m.slice(1))
-        .join(', ')}`
+      `Não foi possível identificar as colunas obrigatórias (${notFound.join(', ')}) na planilha.\n` +
+      `Cabeçalhos encontrados: ${headers.join(' | ')}`
     )
   }
 
   return rawData.map((row) => {
-    const mapped: Record<string, unknown> = {}
-    headers.forEach((header, i) => {
-      const field = mappedHeaders[i]
-      if (field) {
-        mapped[field] = row[header]
-      }
-    })
-    return mapped
+    const rawRow: Record<string, unknown> = {}
+    for (const h of headers) {
+      rawRow[h] = row[h]
+    }
+
+    return {
+      campaign_name: String(row[headers[campaignIdx]] ?? '').trim(),
+      report_date: parseDate(row[headers[dateIdx]]),
+      spend: parseNumber(row[headers[spendIdx]]),
+      raw_data: rawRow,
+    }
   })
 }
 

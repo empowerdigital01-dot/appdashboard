@@ -81,6 +81,12 @@ export default function AdminPage() {
                   Upload
                 </Link>
                 <Link
+                  href={`/admin/${acc.id}/financeiro`}
+                  className="rounded bg-axium-border px-3 py-1 text-xs text-white transition hover:bg-axium-negative"
+                >
+                  Financeiro
+                </Link>
+                <Link
                   href={`/admin/${acc.id}`}
                   className="rounded bg-axium-border px-3 py-1 text-xs text-white transition hover:bg-axium-negative"
                 >
