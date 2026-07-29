@@ -34,13 +34,13 @@ const COLUMN_MAP: Record<string, keyof SpreadsheetRow> = {
   'type': 'type',
 }
 
-const REQUIRED_COLUMNS: (keyof SpreadsheetRow)[] = [
-  'campaign',
-  'date',
-  'investment',
-  'revenue',
+const REQUIRED_COLUMNS = [
+  'campanha',
+  'data',
+  'investimento',
+  'receita',
   'status',
-  'type',
+  'tipo',
 ]
 
 export function parseSpreadsheet(buffer: ArrayBuffer): SpreadsheetRow[] {
@@ -58,12 +58,10 @@ export function parseSpreadsheet(buffer: ArrayBuffer): SpreadsheetRow[] {
   }
 
   const headers = Object.keys(rawData[0])
-  const mappedHeaders = headers.map((h) => {
-    const key = h.toLowerCase().trim()
-    return COLUMN_MAP[key] || null
-  })
+  const normalizedHeaders = headers.map((h) => h.toLowerCase().trim())
+  const mappedHeaders = normalizedHeaders.map((h) => COLUMN_MAP[h] || null)
 
-  const missing = REQUIRED_COLUMNS.filter((col) => !mappedHeaders.includes(col))
+  const missing = REQUIRED_COLUMNS.filter((col) => !normalizedHeaders.includes(col))
   if (missing.length > 0) {
     throw new Error(
       `Colunas obrigatórias ausentes: ${missing
