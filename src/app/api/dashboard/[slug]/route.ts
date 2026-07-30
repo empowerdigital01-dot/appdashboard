@@ -30,7 +30,14 @@ export async function GET(
   const year = req.nextUrl.searchParams.get('year')
 
   const emptyResponse = {
-    financial: null,
+    financial: {
+      totalSpend: 0,
+      totalReceived: 0,
+      balance: 0,
+      totalPendente: 0,
+      statusDistribution: [],
+      typeDistribution: [],
+    },
     topCampaigns: [],
     evolution: [],
     rawDataColumns: [],
@@ -153,11 +160,16 @@ export async function GET(
   const rawDataColumns: string[] = []
   const campaignMetrics: Record<string, unknown>[] = []
   if (currentMetrics && currentMetrics.length > 0) {
-    const EXCLUDED_COLS = new Set(['campaign_name', 'report_date', 'spend'])
+    const EXCLUDED_COLS = new Set([
+      'campaign_name', 'report_date', 'spend',
+      'campanha', 'campaign', 'anúncio', 'anuncio',
+      'ads', 'ad name', 'nome de anúncio', 'nome do anúncio',
+      'campaign name', 'nome da campanha',
+    ])
     const firstRow = currentMetrics[0].raw_data as Record<string, unknown> | null
     if (firstRow) {
       for (const col of Object.keys(firstRow)) {
-        if (!EXCLUDED_COLS.has(col)) rawDataColumns.push(col)
+        if (!EXCLUDED_COLS.has(col.toLowerCase().trim())) rawDataColumns.push(col)
       }
     }
     for (const row of currentMetrics) {

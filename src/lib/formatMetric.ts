@@ -1,26 +1,11 @@
 export type MetricFormat = 'currency' | 'percentage' | 'count'
 
-const MONETARY_PATTERNS = [
-  'custo por', 'valor usado', 'valor', 'investimento',
-  'spend', 'amount spent', 'gasto', 'custo', 'receita',
-  'revenue', 'budget', 'orcamento', 'orçamento',
-]
-
-const PERCENTAGE_PATTERNS = [
-  'ctr', '%', 'cpm', 'taxa', 'rate', 'ratio',
-  'frequencia', 'frequência', 'frequency',
-]
-
 export function detectMetricFormat(fieldName: string): MetricFormat {
   const lower = fieldName.toLowerCase().trim()
 
-  for (const p of PERCENTAGE_PATTERNS) {
-    if (lower.includes(p)) return 'percentage'
-  }
+  if (lower.includes('ctr') || lower.includes('%')) return 'percentage'
 
-  for (const p of MONETARY_PATTERNS) {
-    if (lower.includes(p)) return 'currency'
-  }
+  if (lower.includes('custo por') || lower.includes('valor')) return 'currency'
 
   return 'count'
 }

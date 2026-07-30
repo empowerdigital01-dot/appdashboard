@@ -63,9 +63,15 @@ export function computeEvolution(
 
 const EXCLUDED_COLS = new Set([
   'campaign_name', 'report_date', 'spend',
+  'campanha', 'campaign', 'anúncio', 'anuncio',
+  'ads', 'ad name', 'nome de anúncio', 'nome do anúncio',
+  'campaign name', 'nome da campanha',
 ])
 
 export function getRawDataColumns(rows: Record<string, unknown>[]): string[] {
   if (rows.length === 0) return []
-  return Object.keys(rows[0]).filter((col) => !EXCLUDED_COLS.has(col))
+  return Object.keys(rows[0]).filter((col) => {
+    const lower = col.toLowerCase().trim()
+    return !EXCLUDED_COLS.has(lower)
+  })
 }
